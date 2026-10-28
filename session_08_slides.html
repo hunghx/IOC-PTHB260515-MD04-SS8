@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buổi 08: Xử lý lỗi và tăng độ ổn định với Resilience4j</title>
+  <style>
+    :root {
+      --bg-page: #f1f5f9;
+      --bg-slide: #ffffff;
+      --bg-subtle: #f8fafc;
+      --text-main: #0f172a;
+      --text-secondary: #475569;
+      --spring-green: #16a34a;
+      --spring-light: #dcfce7;
+      --blue: #0284c7;
+      --amber: #d97706;
+      --rose: #e11d48;
+      --purple: #7c3aed;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 16px 28px;
+    }
+    .slide-frame {
+      width: 100%;
+      max-width: 1280px;
+      flex: 1;
+      min-height: 0;
+      background: var(--bg-slide);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
+      border: 1px solid var(--border);
+      padding: 24px 38px;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .slide-frame.active {
+      display: flex;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-header {
+      border-bottom: 2px solid var(--bg-page);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+    .lesson-tag {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: var(--spring-light);
+      color: var(--spring-green);
+    }
+    .slide-title {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 4px;
+    }
+    .slide-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly;
+      gap: 14px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: stretch;
+    }
+    .grid-2-center {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 22px;
+      align-items: center;
+    }
+    .card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    pre {
+      background: #ffffff;
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--blue);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 0.84rem;
+      line-height: 1.42;
+      color: #1e293b;
+      overflow-x: auto;
+    }
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.86em;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    .kw { color: #0284c7; font-weight: 600; }
+    .an { color: #16a34a; font-weight: 600; }
+    .str { color: #b45309; }
+    .cmt { color: #64748b; font-style: italic; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 8px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+      line-height: 1.35;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    th {
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-weight: 700;
+    }
+    .diagram-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 185px;
+    }
+    .controls {
+      width: 100%;
+      max-width: 1280px;
+      padding-top: 10px;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }
+    .btn {
+      background: #ffffff;
+      color: var(--text-main);
+      border: 1px solid var(--border-strong);
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      border-color: var(--spring-green);
+      color: var(--spring-green);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= SLIDE 1: BÀI TOÁN LỖI LAN TRUYỀN (CASCADING FAILURE) ================= -->
+  <section class="slide-frame active">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 1 • Giới thiệu thư viện Resilience4j</span>
+      <div class="slide-title">1. Bài Toán Lỗi Lan Truyền (Cascading Failure) Trong Microservices</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 980 180" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrRed" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#e11d48" />
+            </marker>
+          </defs>
+
+          <!-- Client -->
+          <rect x="20" y="50" width="130" height="90" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="85" y="90" text-anchor="middle" font-weight="bold" font-size="14" fill="#0f172a">👥 End Users</text>
+          <text x="85" y="112" text-anchor="middle" font-size="11" fill="#64748b">1000 req/s</text>
+
+          <line x1="150" y1="95" x2="200" y2="95" stroke="#e11d48" stroke-width="2.5" marker-end="url(#arrRed)"/>
+
+          <!-- Gateway -->
+          <rect x="205" y="50" width="170" height="90" rx="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="290" y="85" text-anchor="middle" font-weight="bold" font-size="14" fill="#0369a1">API Gateway</text>
+          <text x="290" y="108" text-anchor="middle" font-size="11" fill="#0284c7">Tắc nghẽn kết nối</text>
+
+          <line x1="375" y1="95" x2="425" y2="95" stroke="#e11d48" stroke-width="2.5" marker-end="url(#arrRed)"/>
+
+          <!-- Order Service -->
+          <rect x="430" y="40" width="220" height="110" rx="10" fill="#ffe4e6" stroke="#e11d48" stroke-width="2.5"/>
+          <text x="540" y="75" text-anchor="middle" font-weight="bold" font-size="14" fill="#9f1239">Order Service</text>
+          <text x="540" y="98" text-anchor="middle" font-size="12" fill="#e11d48">Cạn kiệt Thread Pool (Tomcat)</text>
+          <text x="540" y="120" text-anchor="middle" font-size="11" font-weight="bold" fill="#be123c">Treo toàn bộ chức năng Order</text>
+
+          <line x1="650" y1="95" x2="710" y2="95" stroke="#e11d48" stroke-width="2.5" marker-end="url(#arrRed)"/>
+
+          <!-- Payment Service Failed -->
+          <rect x="715" y="40" width="235" height="110" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="6"/>
+          <text x="832" y="75" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">⚠️ Payment Service (Lỗi)</text>
+          <text x="832" y="98" text-anchor="middle" font-size="12" fill="#dc2626">Treo kết nối / Timeout 30s</text>
+          <text x="832" y="120" text-anchor="middle" font-size="11" fill="#7f1d1d">Dẫn tới sập chùm toàn hệ thống</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🚨 Hậu quả của Lỗi Lan Truyền (Cascading Failure)</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Vấn đề cốt lõi</th>
+                <th>Tác động trực tiếp</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1 Service phụ bị chậm/lỗi</strong></td>
+                <td>Service chính đứng chờ kết nối trả về (Blocking I/O)</td>
+              </tr>
+              <tr>
+                <td><strong>Cạn kiệt Thread Pool</strong></td>
+                <td>Hết worker threads xử lý cả các nghiệp vụ không liên quan</td>
+              </tr>
+              <tr>
+                <td><strong>Sập dây chuyền (Domino)</strong></td>
+                <td>Hệ thống ngừng hoạt động hoàn toàn (Downtime)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🛡️ Giải pháp: Thư viện Resilience4j</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Module cốt lõi</th>
+                <th>Cơ chế bảo vệ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Circuit Breaker</strong></td>
+                <td>Ngắt mạch tạm thời khi tỷ lệ lỗi vượt ngưỡng</td>
+              </tr>
+              <tr>
+                <td><strong>Retry & TimeLimiter</strong></td>
+                <td>Tự động thử lại thông minh & ngắt sớm nếu timeout</td>
+              </tr>
+              <tr>
+                <td><strong>RateLimiter & Bulkhead</strong></td>
+                <td>Giới hạn tần suất gọi & cô lập tài nguyên độc lập</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 2: LESSON 1 - TỔNG QUAN RESILIENCE4J & DEPENDENCY ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 1 • Giới thiệu thư viện Resilience4j</span>
+      <div class="slide-title">2. Các Module Cốt Lõi Của Resilience4j & Cài Đặt Trong Spring Boot</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Khai báo Dependency trong <code>pom.xml</code></div>
+          <pre><code><span class="cmt">&lt;!-- Resilience4j Starter cho Spring Boot 3 --&gt;</span>
+&lt;<span class="kw">dependency</span>&gt;
+    &lt;<span class="kw">groupId</span>&gt;io.github.resilience4j&lt;/<span class="kw">groupId</span>&gt;
+    &lt;<span class="kw">artifactId</span>&gt;resilience4j-spring-boot3&lt;/<span class="kw">artifactId</span>&gt;
+&lt;/<span class="kw">dependency</span>&gt;
+
+<span class="cmt">&lt;!-- Spring AOP (bắt buộc để kích hoạt Annotation) --&gt;</span>
+&lt;<span class="kw">dependency</span>&gt;
+    &lt;<span class="kw">groupId</span>&gt;org.springframework.boot&lt;/<span class="kw">groupId</span>&gt;
+    &lt;<span class="kw">artifactId</span>&gt;spring-boot-starter-aop&lt;/<span class="kw">artifactId</span>&gt;
+&lt;/<span class="kw">dependency</span>&gt;
+
+<span class="cmt">&lt;!-- Spring Boot Actuator (theo dõi trạng thái Circuit) --&gt;</span>
+&lt;<span class="kw">dependency</span>&gt;
+    &lt;<span class="kw">groupId</span>&gt;org.springframework.boot&lt;/<span class="kw">groupId</span>&gt;
+    &lt;<span class="kw">artifactId</span>&gt;spring-boot-starter-actuator&lt;/<span class="kw">artifactId</span>&gt;
+&lt;/<span class="kw">dependency</span>&gt;</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. Bộ 5 Vũ Khí Của Resilience4j</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Annotation</th>
+                <th>Ý nghĩa nghiệp vụ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>@CircuitBreaker</code></td>
+                <td>Đóng/ngắt mạch tự động khi phát hiện service phụ lỗi</td>
+              </tr>
+              <tr>
+                <td><code>@Retry</code></td>
+                <td>Thử lại khi gặp lỗi tạm thời (mạng chập chờn, 503)</td>
+              </tr>
+              <tr>
+                <td><code>@RateLimiter</code></td>
+                <td>Khống chế số lượng request tối đa trong khoảng thời gian</td>
+              </tr>
+              <tr>
+                <td><code>@TimeLimiter</code></td>
+                <td>Chặn request chạy quá lâu (ngăn cạn kiệt thread)</td>
+              </tr>
+              <tr>
+                <td><code>@Bulkhead</code></td>
+                <td>Phân vùng thread pool riêng cho từng dịch vụ gọi ngoài</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 3: LESSON 2 - MÔ HÌNH 3 TRẠNG THÁI CIRCUIT BREAKER ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 2 • Cài đặt circuit breaker + fallback</span>
+      <div class="slide-title">3. Cơ Chế Hoạt Động Của Circuit Breaker (3 Trạng Thái)</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 980 185" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#0284c7" />
+            </marker>
+            <marker id="arr2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#e11d48" />
+            </marker>
+            <marker id="arr3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#16a34a" />
+            </marker>
+          </defs>
+
+          <!-- CLOSED State -->
+          <rect x="30" y="35" width="260" height="115" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2.5"/>
+          <text x="160" y="70" text-anchor="middle" font-weight="bold" font-size="16" fill="#14532d">🟢 CLOSED (Đóng mạch)</text>
+          <text x="160" y="95" text-anchor="middle" font-size="12" fill="#15803d">Hoạt động bình thường</text>
+          <text x="160" y="118" text-anchor="middle" font-size="11" fill="#166534">Mọi request chuyển thẳng tới service phụ</text>
+
+          <!-- CLOSED -> OPEN -->
+          <line x1="290" y1="65" x2="410" y2="65" stroke="#e11d48" stroke-width="2.5" marker-end="url(#arr2)"/>
+          <text x="350" y="55" text-anchor="middle" font-size="11" font-weight="bold" fill="#e11d48">Tỷ lệ lỗi &gt; 50%</text>
+
+          <!-- OPEN State -->
+          <rect x="415" y="35" width="260" height="115" rx="14" fill="#fee2e2" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="545" y="70" text-anchor="middle" font-weight="bold" font-size="16" fill="#991b1b">🔴 OPEN (Ngắt mạch)</text>
+          <text x="545" y="95" text-anchor="middle" font-size="12" fill="#dc2626">Chặn mọi request tới service phụ</text>
+          <text x="545" y="118" text-anchor="middle" font-weight="bold" font-size="11" fill="#be123c">Chuyển ngay tới hàm Fallback</text>
+
+          <!-- OPEN -> HALF_OPEN -->
+          <line x1="675" y1="92" x2="735" y2="92" stroke="#0284c7" stroke-width="2.5" marker-end="url(#arr1)"/>
+          <text x="705" y="80" text-anchor="middle" font-size="11" font-weight="bold" fill="#0284c7">Hết 10s chờ</text>
+
+          <!-- HALF_OPEN State -->
+          <rect x="740" y="35" width="220" height="115" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+          <text x="850" y="70" text-anchor="middle" font-weight="bold" font-size="16" fill="#78350f">🟡 HALF_OPEN</text>
+          <text x="850" y="95" text-anchor="middle" font-size="12" fill="#92400e">Cho thử vài request</text>
+          <text x="850" y="118" text-anchor="middle" font-size="11" fill="#b45309">Đánh giá sức khỏe service</text>
+
+          <!-- HALF_OPEN -> CLOSED (Success) -->
+          <path d="M 850 150 Q 545 190 160 150" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="4" marker-end="url(#arr3)"/>
+          <text x="545" y="180" text-anchor="middle" font-size="11" font-weight="bold" fill="#16a34a">Tỷ lệ thành công đạt chuẩn ➔ Đóng mạch (CLOSED)</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">⚙️ Cấu hình Circuit Breaker trong <code>application.yml</code></div>
+          <pre><code><span class="kw">resilience4j.circuitbreaker.instances:</span>
+  <span class="kw">paymentService:</span>
+    <span class="kw">sliding-window-type:</span> COUNT_BASED
+    <span class="kw">sliding-window-size:</span> 10              <span class="cmt"># Xét trong 10 request gần nhất</span>
+    <span class="kw">failure-rate-threshold:</span> 50           <span class="cmt"># Lỗi &gt;= 50% là ngắt mạch (OPEN)</span>
+    <span class="kw">wait-duration-in-open-state:</span> 10s     <span class="cmt"># Chờ 10s trước khi sang HALF_OPEN</span>
+    <span class="kw">permitted-number-of-calls-in-half-open-state:</span> 3</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">💡 Giải thích các tham số then chốt</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tham số</th>
+                <th>Ý nghĩa thực tế</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sliding-window-size</code></td>
+                <td>Số lượng request thu thập để tính toán tỷ lệ lỗi</td>
+              </tr>
+              <tr>
+                <td><code>failure-rate-threshold</code></td>
+                <td>Ngưỡng % lỗi kích hoạt trạng thái OPEN</td>
+              </tr>
+              <tr>
+                <td><code>wait-duration-in-open-state</code></td>
+                <td>Thời gian cách ly để service phụ tự hồi phục</td>
+              </tr>
+              <tr>
+                <td><code>permitted-calls-in-half-open</code></td>
+                <td>Số lượng request cho qua để thử nghiệm</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 4: LESSON 2 - CODE CÀI ĐẶT CIRCUIT BREAKER + FALLBACK ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 2 • Cài đặt circuit breaker + fallback</span>
+      <div class="slide-title">4. Cài Đặt @CircuitBreaker & Xây Dựng Phương Thức Fallback</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Code Service với <code>@CircuitBreaker</code> và Fallback</div>
+          <pre><code><span class="an">@Service</span>
+<span class="kw">public class</span> OrderService {
+
+    <span class="an">@Autowired</span>
+    <span class="kw">private</span> PaymentClient paymentClient;
+
+    <span class="an">@CircuitBreaker</span>(name = <span class="str">"paymentService"</span>, fallbackMethod = <span class="str">"paymentFallback"</span>)
+    <span class="kw">public</span> String processPayment(OrderRequest request) {
+        <span class="kw">return</span> paymentClient.callPaymentApi(request);
+    }
+
+    <span class="cmt">// Phương thức Fallback dự phòng khi mạch OPEN hoặc gọi bị lỗi</span>
+    <span class="kw">public</span> String paymentFallback(OrderRequest request, Throwable ex) {
+        <span class="kw">return</span> <span class="str">"Cổng thanh toán đang bảo trì. Đơn hàng chuyển sang: Chờ thanh toán COD!"</span>;
+    }
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">⚠️ 3 Quy Tắc Bắt Buộc Khi Viết Hàm Fallback</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Quy tắc</th>
+                <th>Mô tả chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1. Cùng kiểu trả về</strong></td>
+                <td>Kiểu dữ liệu trả về của hàm fallback phải giống hệt hàm gốc (VD: <code>String</code>)</td>
+              </tr>
+              <tr>
+                <td><strong>2. Cùng danh sách tham số</strong></td>
+                <td>Phải nhận đầy đủ các tham số của hàm gốc theo đúng thứ tự</td>
+              </tr>
+              <tr>
+                <td><strong>3. Thêm tham số Throwable</strong></td>
+                <td>Tham số cuối cùng bắt buộc là <code>Throwable ex</code> hoặc Exception cụ thể để bắt lỗi</td>
+              </tr>
+              <tr>
+                <td><strong>4. Vị trí nằm cùng Class</strong></td>
+                <td>Nằm trong cùng class Spring Bean để cơ chế AOP ủy quyền chính xác</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 5: LESSON 3 - CẤU HÌNH RETRY THÔNG MINH ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 3 • Cấu hình Retry, giới hạn tần suất, timeout</span>
+      <div class="slide-title">5. Cấu Hình Cơ Chế Tự Động Thử Lại Thông Minh (@Retry)</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 980 140" xmlns="http://www.w3.org/2000/svg">
+          <!-- Step 1 -->
+          <rect x="25" y="25" width="200" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="125" y="60" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">Lần 1: Lỗi Timeout</text>
+          <text x="125" y="85" text-anchor="middle" font-size="11" fill="#dc2626">Chờ 2 giây (Wait Duration)</text>
+
+          <text x="255" y="75" text-anchor="middle" font-size="22" font-weight="bold" fill="#0284c7">➔</text>
+
+          <!-- Step 2 -->
+          <rect x="285" y="25" width="200" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="385" y="60" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">Lần 2: Lỗi 503 Service</text>
+          <text x="385" y="85" text-anchor="middle" font-size="11" fill="#dc2626">Chờ 2 giây tiếp theo</text>
+
+          <text x="515" y="75" text-anchor="middle" font-size="22" font-weight="bold" fill="#16a34a">➔</text>
+
+          <!-- Step 3 -->
+          <rect x="545" y="25" width="200" height="90" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+          <text x="645" y="60" text-anchor="middle" font-weight="bold" font-size="14" fill="#14532d">Lần 3: Thành Công 200 OK</text>
+          <text x="645" y="85" text-anchor="middle" font-size="11" fill="#16a34a">Service phụ đã phục hồi</text>
+
+          <!-- If all fail -->
+          <line x1="755" y1="70" x2="795" y2="70" stroke="#475569" stroke-width="2" stroke-dasharray="4"/>
+          <rect x="800" y="25" width="160" height="90" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <text x="880" y="60" text-anchor="middle" font-weight="bold" font-size="13" fill="#78350f">Nếu vẫn lỗi sau 3 lần</text>
+          <text x="880" y="85" text-anchor="middle" font-weight="bold" font-size="11" fill="#b45309">Gọi Fallback</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Cấu hình Retry trong <code>application.yml</code></div>
+          <pre><code><span class="kw">resilience4j.retry.instances:</span>
+  <span class="kw">paymentService:</span>
+    <span class="kw">max-attempts:</span> 3                     <span class="cmt"># Số lần thử tối đa</span>
+    <span class="kw">wait-duration:</span> 2s                   <span class="cmt"># Thời gian chờ giữa các lần</span>
+    <span class="kw">retry-exceptions:</span>                   <span class="cmt"># Chỉ thử lại khi gặp lỗi tạm thời</span>
+      - java.io.IOException
+      - org.springframework.web.client.HttpServerErrorException
+    <span class="kw">ignore-exceptions:</span>                  <span class="cmt"># Không retry lỗi nghiệp vụ client</span>
+      - com.example.InvalidPaymentException</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Gắn Annotation <code>@Retry</code> vào Code</div>
+          <pre><code><span class="an">@Service</span>
+<span class="kw">public class</span> PaymentGatewayService {
+
+    <span class="an">@Retry</span>(name = <span class="str">"paymentService"</span>, fallbackMethod = <span class="str">"retryFallback"</span>)
+    <span class="kw">public</span> PaymentResponse pay(PaymentRequest req) {
+        <span class="kw">return</span> restTemplate.postForObject(<span class="str">"/pay"</span>, req, PaymentResponse.<span class="kw">class</span>);
+    }
+
+    <span class="kw">public</span> PaymentResponse retryFallback(PaymentRequest req, Throwable ex) {
+        <span class="kw">return new</span> PaymentResponse(<span class="str">"FAILED"</span>, <span class="str">"Thanh toán lỗi sau 3 lần thử"</span>);
+    }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 6: LESSON 3 - RATE LIMITER & TIME LIMITER ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 3 • Cấu hình Retry, giới hạn tần suất, timeout</span>
+      <div class="slide-title">6. Giới Hạn Tần Suất (@RateLimiter) & Chặn Timeout (@TimeLimiter)</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Giới hạn tần suất gọi với <code>@RateLimiter</code></div>
+          <pre><code><span class="cmt"># Cho phép tối đa 5 request trong chu kỳ 10 giây</span>
+<span class="kw">resilience4j.ratelimiter.instances:</span>
+  <span class="kw">orderApiRateLimit:</span>
+    <span class="kw">limit-for-period:</span> 5
+    <span class="kw">limit-refresh-period:</span> 10s
+    <span class="kw">timeout-duration:</span> 0ms <span class="cmt"># Quá tải là từ chối ngay (429)</span></code></pre>
+          <pre style="margin-top: 10px;"><code><span class="an">@RateLimiter</span>(name = <span class="str">"orderApiRateLimit"</span>, fallbackMethod = <span class="str">"rateLimitFallback"</span>)
+<span class="kw">public</span> String createOrder() { <span class="kw">return</span> <span class="str">"Order Created"</span>; }
+
+<span class="kw">public</span> String rateLimitFallback(Throwable ex) {
+    <span class="kw">return</span> <span class="str">"Hệ thống đang quá tải, vui lòng thử lại sau vài giây!"</span>;
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. Ngắt kết nối chạy quá lâu với <code>@TimeLimiter</code></div>
+          <pre><code><span class="cmt"># Bắt buộc kết thúc trong 3 giây</span>
+<span class="kw">resilience4j.timelimiter.instances:</span>
+  <span class="kw">inventoryCheck:</span>
+    <span class="kw">timeout-duration:</span> 3s
+    <span class="kw">cancel-running-future:</span> true</code></pre>
+          <pre style="margin-top: 10px;"><code><span class="cmt">// @TimeLimiter thường áp dụng cho CompletableFuture / Reactor</span>
+<span class="an">@TimeLimiter</span>(name = <span class="str">"inventoryCheck"</span>, fallbackMethod = <span class="str">"timeFallback"</span>)
+<span class="kw">public</span> CompletableFuture&lt;Boolean&gt; checkInventory() {
+    <span class="kw">return</span> CompletableFuture.supplyAsync(() -&gt; slowInventoryApi());
+}
+
+<span class="kw">public</span> CompletableFuture&lt;Boolean&gt; timeFallback(Throwable ex) {
+    <span class="kw">return</span> CompletableFuture.completedFuture(<span class="kw">false</span>);
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 7: LESSON 4 - CÁC CHIẾN LƯỢC FALLBACK NGHIỆP VỤ ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 4 • Xử lý lỗi khi service phụ bị lỗi</span>
+      <div class="slide-title">7. Các Chiến Lược Xử Lý Lỗi Nghiệp Vụ (Fallback Patterns)</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Chiến lược 1: Trả về Cache Cũ (Stale Cache)</div>
+          <pre><code><span class="cmt">// Khi Product Catalog Service lỗi, đọc dữ liệu cũ từ Redis</span>
+<span class="an">@CircuitBreaker</span>(name = <span class="str">"catalogService"</span>, fallbackMethod = <span class="str">"getCachedProducts"</span>)
+<span class="kw">public</span> List&lt;Product&gt; getPopularProducts() {
+    <span class="kw">return</span> catalogClient.fetchPopular();
+}
+
+<span class="kw">public</span> List&lt;Product&gt; getCachedProducts(Throwable ex) {
+    <span class="kw">return</span> redisTemplate.opsForList().range(<span class="str">"cached_popular"</span>, 0, -1);
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Chiến lược 2: Graceful Degradation (Giảm cấp dịch vụ)</div>
+          <pre><code><span class="cmt">// Khi Recommendation AI bị sập, hiển thị sản phẩm ngẫu nhiên mặc định</span>
+<span class="an">@CircuitBreaker</span>(name = <span class="str">"recommendService"</span>, fallbackMethod = <span class="str">"getDefaultRecommend"</span>)
+<span class="kw">public</span> List&lt;String&gt; getPersonalizedRecommend(Long userId) {
+    <span class="kw">return</span> aiClient.getPredictions(userId);
+}
+
+<span class="kw">public</span> List&lt;String&gt; getDefaultRecommend(Long userId, Throwable ex) {
+    <span class="kw">return</span> List.of(<span class="str">"Áo thun cơ bản"</span>, <span class="str">"Bình giữ nhiệt"</span>);
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Chiến lược 3: Hàng đợi dự phòng (Message Queue / Asynchronous)</div>
+          <pre><code><span class="cmt">// Khi Notification Service lỗi, gửi Message vào Kafka/RabbitMQ để gửi sau</span>
+<span class="kw">public void</span> notifyFallback(OrderEvent event, Throwable ex) {
+    kafkaTemplate.send(<span class="str">"failed_notifications_topic"</span>, event);
+}</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Chiến lược 4: Chuyển hướng phương thức tương đương (Failover)</div>
+          <pre><code><span class="cmt">// Khi Cổng thanh toán VNPay lỗi, tự động chuyển sang Cổng Momo</span>
+<span class="kw">public</span> PaymentResult payFallback(PaymentDto dto, Throwable ex) {
+    <span class="kw">return</span> momoClient.pay(dto);
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 8: LESSON 4 - GIÁM SÁT CIRCUIT BREAKER VỚI ACTUATOR ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <span class="lesson-tag">Lesson 4 • Xử lý lỗi khi service phụ bị lỗi</span>
+      <div class="slide-title">8. Giám Sát Sức Khỏe & Trạng Thái Mạch Qua Spring Boot Actuator</div>
+    </div>
+
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Mở Endpoint Giám Sát trong <code>application.yml</code></div>
+          <pre><code><span class="kw">management:</span>
+  <span class="kw">endpoints:</span>
+    <span class="kw">web:</span>
+      <span class="kw">exposure:</span>
+        <span class="kw">include:</span> health, info, metrics, circuitbreakers, circuitbreakerevents
+  <span class="kw">endpoint:</span>
+    <span class="kw">health:</span>
+      <span class="kw">show-details:</span> always
+  <span class="kw">health:</span>
+    <span class="kw">circuitbreakers:</span>
+      <span class="kw">enabled:</span> true</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. JSON Kiểm Tra Trực Tiếp (<code>GET /actuator/health</code>)</div>
+          <pre><code>{
+  <span class="str">"status"</span>: <span class="str">"UP"</span>,
+  <span class="str">"components"</span>: {
+    <span class="str">"circuitBreakers"</span>: {
+      <span class="str">"status"</span>: <span class="str">"UP"</span>,
+      <span class="str">"details"</span>: {
+        <span class="str">"paymentService"</span>: {
+          <span class="str">"status"</span>: <span class="str">"CIRCUIT_OPEN"</span>,
+          <span class="str">"failureRate"</span>: <span class="str">"70.0%"</span>,
+          <span class="str">"slowCallRate"</span>: <span class="str">"0.0%"</span>,
+          <span class="str">"state"</span>: <span class="str">"OPEN"</span>
+        }
+      }
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 Các URL Quan Sát Trực Tiếp Trên Trình Duyệt / Postman</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Endpoint URL</th>
+              <th>Công dụng giám sát</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET http://localhost:8081/actuator/health</code></td>
+              <td>Xem trạng thái tổng thể và trạng thái mạch hiện tại (<code>CLOSED</code>, <code>OPEN</code>, <code>HALF_OPEN</code>)</td>
+            </tr>
+            <tr>
+              <td><code>GET http://localhost:8081/actuator/circuitbreakers</code></td>
+              <td>Liệt kê danh sách tất cả các Circuit Breakers đang chạy trong ứng dụng</td>
+            </tr>
+            <tr>
+              <td><code>GET http://localhost:8081/actuator/circuitbreakerevents</code></td>
+              <td>Xem dòng lịch sử các sự kiện chuyển đổi trạng thái (Transition Events) và các lần gọi lỗi</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Điều hướng Slide -->
+  <div class="controls">
+    <div>
+      <button class="btn" onclick="prev()">◀ Slide trước (←)</button>
+      <button class="btn" onclick="next()" style="margin-left: 8px;">Slide tiếp (→) ▶</button>
+    </div>
+    <div id="page-indicator" style="font-weight: 700;">Slide 1 / 8</div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide-frame');
+    const indicator = document.getElementById('page-indicator');
+    let current = 0;
+
+    function showSlide(index) {
+      slides.forEach((s, i) => s.classList.toggle('active', i === index));
+      indicator.textContent = `Slide ${index + 1} / ${slides.length}`;
+    }
+    function next() {
+      if (current < slides.length - 1) { current++; showSlide(current); }
+    }
+    function prev() {
+      if (current > 0) { current--; showSlide(current); }
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    });
+  </script>
+</body>
+</html>
